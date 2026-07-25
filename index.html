@@ -202,7 +202,7 @@ tr.DIFFR td.DEL{background:#f3f0ff!important}
 .pcontrols select{padding:3px 5px;border:1px solid rgba(255,255,255,.35);border-radius:2px;background:rgba(255,255,255,.13);color:#fff;font-size:11px;font-family:inherit;cursor:pointer}
 .pcontrols select option{color:#111;background:#fff}
 #cmpBody{flex:1;overflow-y:auto;padding:8px}
-.cmp-mode-btn{display:flex;gap:3px;margin-bottom:6px}
+.cmp-mode-btn{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px}
 .cmp-mode-btn button{padding:2px 8px;font-size:11px;border:1px solid #ccc;border-radius:2px;cursor:pointer;background:#fff;font-family:inherit}
 .cmp-mode-btn button.active{background:#2e6099;color:#fff;border-color:#2e6099}
 .cmp-empty{text-align:center;padding:30px;color:#aaa;font-size:12px;line-height:2}
@@ -1036,6 +1036,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       <button class="tbtn p" id="mbSubBtn_dash" onclick="switchMobileSub('dash')">📊 지표</button>
       <button class="tbtn" id="mbSubBtn_cattle" onclick="switchMobileSub('cattle')">🐄 사육·출하</button>
       <button class="tbtn" id="mbSubBtn_inv" onclick="switchMobileSub('inv')">📦 재고</button>
+      <button class="tbtn" id="mbSubBtn_txn" onclick="switchMobileSub('txn')">📑 매입매출</button>
+      <button class="tbtn" id="mbSubBtn_prod" onclick="switchMobileSub('prod')">🏭 생산</button>
+      <button class="tbtn" id="mbSubBtn_bank" onclick="switchMobileSub('bank')">🏦 자금</button>
     </div>
     <div class="scrollwrap">
       <div id="mbWrap" style="max-width:560px;margin:0 auto"></div>
@@ -3560,7 +3563,7 @@ let currentUser=null; // {id, name, role:'edit'|'view', company}
 // ══════════════════════
 // 자동 업데이트 감지
 // ══════════════════════
-const APP_VERSION = 349; // 내부 버전번호 = 표시버전×100 (104=v1.04). 패치할 때마다 +1 하세요 (version.json 불필요 — 업데이트 감지는 이 값을 직접 읽음)
+const APP_VERSION = 350; // 내부 버전번호 = 표시버전×100 (104=v1.04). 패치할 때마다 +1 하세요 (version.json 불필요 — 업데이트 감지는 이 값을 직접 읽음)
 const APP_VERSION_LABEL = 'v' + (APP_VERSION/100).toFixed(2);
 try{ document.getElementById('appVerBadge').textContent = APP_VERSION_LABEL; }catch(e){}
 /* ── 전역 에러 안전망(v2.21): 스크립트가 죽으면 흰 화면/먹통 대신 원인을 배너로 표시 ── */
@@ -5369,7 +5372,7 @@ function switchTab(name,el){
   }
   if(name==='mobile'){
     loadInvFromGS(true);
-    hanwooEnsureLoaded().then(()=>renderMobile());
+    Promise.all([hanwooEnsureLoaded(),vendorTxnEnsureLoaded()]).then(()=>renderMobile());
   }
 }
 // 탭 접근 권한: currentUser.tabs 배열에 있거나, 비어있으면 전체 허용
@@ -9966,7 +9969,7 @@ function openBankForm(id){
   if(!modal){
     modal=document.createElement('div');
     modal.id='bankModal'; modal.className='modal';
-    modal.innerHTML=`<div style="background:var(--surface);border-radius:8px;padding:22px;width:760px;max-width:97vw;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-md)" id="bankModalBody"></div>`;
+    modal.innerHTML=`<div style="background:var(--surface);border-radius:8px;padding:22px;width:760px;max-width:97vw;max-height:92vh;overflow-y:auto;overflow-x:auto;box-shadow:var(--shadow-md)" id="bankModalBody"></div>`;
     document.body.appendChild(modal);
   }
   document.getElementById('bankModalBody').innerHTML=body;
@@ -10313,7 +10316,7 @@ function csIncCsv(farm,rows){
 let _mbSubTab='dash';
 function switchMobileSub(tab){
   _mbSubTab=tab;
-  ['dash','cattle','inv'].forEach(t=>{
+  ['dash','cattle','inv','txn','prod','bank'].forEach(t=>{
     const b=document.getElementById('mbSubBtn_'+t);
     if(b)b.className=t===tab?'tbtn p':'tbtn';
   });
@@ -10323,6 +10326,9 @@ function renderMobile(){
   if(_mbSubTab==='dash')renderMobileDash();
   else if(_mbSubTab==='cattle')renderMobileCattle();
   else if(_mbSubTab==='inv')renderMobileInv();
+  else if(_mbSubTab==='txn')renderMobileTxn();
+  else if(_mbSubTab==='prod')renderMobileProd();
+  else if(_mbSubTab==='bank')renderMobileBank();
 }
 function mbCard(inner,extra){
   return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow-sm)${extra||''}">${inner}</div>`;
@@ -10423,6 +10429,64 @@ function mbSaveStock(name,domId){
   pushDirtyInvEvent(name);
   toast(`"${name}" 재고 저장됨`);
   renderMobileInv();
+}
+/* ── 📑 매입매출(카드 리스트 + 기존 등록폼 재사용) ── */
+let _mbTxnKind='';
+function mbSetTxnKind(k){ _mbTxnKind=k; renderMobileTxn(); }
+function renderMobileTxn(){
+  let list=TXNS.slice().sort((a,b)=>(b.거래일자||'').localeCompare(a.거래일자||''));
+  if(_mbTxnKind)list=list.filter(t=>t.구분===_mbTxnKind);
+  list=list.slice(0,60);
+  const rows=list.map(t=>{
+    const 잔액=num(t.합계금액)-num(t.결제액);
+    return mbCard(`
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><div style="font-weight:700;font-size:14px">${esc(vendorName(t.거래처id))} <span style="font-size:11px;font-weight:400;color:${t.구분==='매출'?'var(--primary)':'var(--text-muted)'}">${t.구분==='매출'?'· 매출':'· 매입'}</span></div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${esc(t.거래일자||'')} · ${esc(t.품목||'')} · ${fmt0(t.수량)}</div>
+        <div style="font-size:13px;margin-top:2px;font-weight:600">${fmt0(t.합계금액)}원${잔액>0?` <span style="color:var(--danger);font-weight:400;font-size:11px">(미결제 ${fmt0(잔액)})</span>`:''}</div></div>
+        <button class="tbtn p" onclick="openTxnForm('${t.id}')">✏</button>
+      </div>`);
+  }).join('');
+  document.getElementById('mbWrap').innerHTML=`
+    <div style="display:flex;gap:6px;margin-bottom:10px;position:sticky;top:0;background:var(--bg);padding:4px 0;z-index:5">
+      <button class="tbtn ${_mbTxnKind===''?'p':''}" onclick="mbSetTxnKind('')" style="flex:1">전체</button>
+      <button class="tbtn ${_mbTxnKind==='매입'?'p':''}" onclick="mbSetTxnKind('매입')" style="flex:1">매입</button>
+      <button class="tbtn ${_mbTxnKind==='매출'?'p':''}" onclick="mbSetTxnKind('매출')" style="flex:1">매출</button>
+    </div>
+    <button class="tbtn p" style="width:100%;margin-bottom:10px;padding:12px;font-size:14px" onclick="openTxnForm()">+ 매입/매출 등록</button>
+    ${rows||'<div style="text-align:center;color:#999;padding:30px 0">등록된 내역이 없습니다</div>'}`;
+}
+/* ── 🏭 생산관리(카드 리스트 + 기존 등록폼 재사용) ── */
+function renderMobileProd(){
+  const list=PRODS.slice().sort((a,b)=>(b.생산일자||'').localeCompare(a.생산일자||'')).slice(0,60);
+  const rows=list.map(p=>mbCard(`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><div style="font-weight:700;font-size:14px">${esc(p.사료명||'')}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${esc(p.생산일자||'')} · ${p.포장구분==='포장'?`📦 포장 ${fmt0(p.포장단위)}kg×${fmt0(p.포장수량)}EA`:'🧺 벌크'}</div>
+      <div style="font-size:13px;margin-top:2px;font-weight:600">${fmt0(p.생산수량)}kg${p.원료비?` · 원료비 ${fmt0(p.원료비)}원`:''}</div></div>
+      <button class="tbtn p" onclick="openProdForm('${p.id}')">✏</button>
+    </div>`)).join('');
+  document.getElementById('mbWrap').innerHTML=`
+    <button class="tbtn p" style="width:100%;margin-bottom:10px;padding:12px;font-size:14px" onclick="openProdForm()">+ 생산 등록</button>
+    ${rows||'<div style="text-align:center;color:#999;padding:30px 0">등록된 생산이력이 없습니다</div>'}`;
+}
+/* ── 🏦 자금관리(최근 며칠 요약 카드 + 기존 등록폼 재사용, 표 형태 입력은 폰에서도 그대로 열림) ── */
+function renderMobileBank(){
+  const list=BANKDAYS.slice().sort((a,b)=>(b.일자||'').localeCompare(a.일자||'')).slice(0,14);
+  const rows=list.map(b=>{
+    const 통장합=(b.통장||[]).reduce((s,t)=>s+num(t.금일잔액),0);
+    return mbCard(`
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><div style="font-weight:700;font-size:14px">${esc(b.일자||'')} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${esc(b.회사||'')}</span></div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:3px">출금 ${fmt0(bkGrossSum(b.출금))} · 입금 ${fmt0(bkGrossSum(b.입금))}</div>
+        <div style="font-size:13px;margin-top:2px;font-weight:600">보통예금 잔액합 ${fmt0(통장합)}원</div></div>
+        <button class="tbtn p" onclick="openBankForm('${b.id}')">✏</button>
+      </div>`);
+  }).join('');
+  document.getElementById('mbWrap').innerHTML=`
+    <button class="tbtn p" style="width:100%;margin-bottom:10px;padding:12px;font-size:14px" onclick="openBankForm()">+ 오늘 지출내역서 작성</button>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">작성 화면은 항목이 많아 폰에서는 데스크톱과 동일한 표 입력창이 그대로 열립니다(가로 스크롤 가능).</div>
+    ${rows||'<div style="text-align:center;color:#999;padding:30px 0">등록된 지출내역서가 없습니다</div>'}`;
 }
 
 /* ══════════ 수입자료 — 계약(import_contracts) → 컨테이너/선적(import_containers) →
@@ -11322,7 +11386,7 @@ function openTxnBulkForm(){
   let modal=document.getElementById('txnBulkModal');
   if(!modal){
     modal=document.createElement('div'); modal.id='txnBulkModal'; modal.className='modal';
-    modal.innerHTML=`<div style="background:var(--surface);border-radius:8px;padding:22px;width:760px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-md)" id="txnBulkModalBody"></div>`;
+    modal.innerHTML=`<div style="background:var(--surface);border-radius:8px;padding:22px;width:760px;max-width:96vw;max-height:90vh;overflow-y:auto;overflow-x:auto;box-shadow:var(--shadow-md)" id="txnBulkModalBody"></div>`;
     document.body.appendChild(modal);
   }
   document.getElementById('txnBulkModalBody').innerHTML=body;
