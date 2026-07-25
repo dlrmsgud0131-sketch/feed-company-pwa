@@ -54,7 +54,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',Arial,sans-serif;font-size:12px
 .tab:hover:not(.active){color:#fff;background:rgba(255,255,255,.1)}
 
 /* ── Layout ── */
-#app{display:flex;flex:1;overflow:hidden}
+#app{display:flex;flex:1;overflow:hidden;position:relative}
 #lpToggleTab{width:22px;flex-shrink:0;background:#2e6099;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:11px;padding:8px 0;user-select:none;line-height:1.4;border-right:2px solid #1e4d7b}
 #lpToggleTab:hover{background:#1e4d7b}
 #lpToggleTab.hidden{display:none}
@@ -95,7 +95,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',Arial,sans-serif;font-size:12px
 .page.active{display:flex}
 
 /* ══ CALC PAGE (split) ══ */
-#page-calc{flex-direction:row!important}
+#page-calc{flex-direction:row!important;position:relative}
 #calcLeft{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
 #cmpToggleTab{width:22px;flex-shrink:0;background:#2e6099;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;writing-mode:vertical-rl;letter-spacing:2px;padding:8px 0;user-select:none;border-left:2px solid #1e4d7b}
 #cmpToggleTab:hover{background:#1e4d7b}
@@ -315,6 +315,41 @@ table.pr-table td.num{text-align:right}
   .print-page{width:100%!important;min-height:100vh!important;box-shadow:none!important;margin:0!important;box-sizing:border-box;page-break-after:always}
   .print-page:last-child{page-break-after:auto}
   .print-page-num{display:none}
+}
+
+/* ══════════ 모바일 반응형(2026-07-25, PWA/APK 대응) ══════════
+   전체를 폰 전용으로 다시 짜지 않고, 기존 데스크톱 레이아웃 위에 이 한 블록만 얹어서
+   좁은 화면에서 쓸만하게 만드는 전략 — 터치 타깃 확대, 원료선택·성분비교 패널을 오버레이 서랍으로,
+   표는 가로스크롤 유지(스프레드시트 성격상 열을 억지로 줄이면 오히려 못 씀). */
+@media (max-width:860px){
+  body{font-size:13px}
+  .r-btn,.tbtn,.tab-chip{min-height:34px;padding:7px 12px;font-size:13px}
+  .tab{padding:10px 14px;font-size:13px;min-height:38px;display:flex;align-items:center}
+  .inp,input,select,textarea{font-size:14px!important}
+  #feedName{width:96px}
+  #feedDate{width:96px}
+  #ribbon,#tabbar{-webkit-overflow-scrolling:touch}
+  .toolbar{padding:8px 10px;gap:6px}
+  .cards{padding:8px 10px 0;gap:8px}
+  .card{min-width:calc(50% - 8px);padding:9px 12px}
+  .scrollwrap,#sheetWrap{-webkit-overflow-scrolling:touch}
+  table.grid th,table.grid td{padding:7px 9px;font-size:12.5px}
+  /* 배합비 탭: 원료선택(왼쪽)·성분비교(오른쪽) 패널을 화면을 밀어내지 않는 오버레이 서랍으로 전환 */
+  #leftpanel{position:absolute;top:0;bottom:0;left:0;width:84vw;max-width:320px;z-index:60;
+    box-shadow:2px 0 16px rgba(0,0,0,.35);transform:translateX(0);transition:transform .18s ease}
+  #leftpanel.collapsed{display:flex!important;transform:translateX(-102%)}
+  #calcRight{position:absolute;top:0;bottom:0;right:0;width:88vw;max-width:380px;z-index:60;
+    box-shadow:-2px 0 16px rgba(0,0,0,.35)}
+  #lpToggleTab,#cmpToggleTab{width:30px;font-size:12px}
+  .ing-li{padding:10px 8px;min-height:40px}
+  /* 새 원료 등록 모달의 4열 성분 그리드는 좁은 화면에서 2열로 */
+  #niNutGrid{grid-template-columns:repeat(2,1fr)!important}
+  /* 로그인 화면은 이미 반응형(width:360px;max-width:92vw)이라 별도 조정 불필요 */
+}
+@media (max-width:480px){
+  .card{min-width:100%}
+  #calcRight{width:94vw}
+  #leftpanel{width:90vw}
 }
 
 /* ══════════ 2026-07-11: 한우 관리 탭 병합(한우.html에서 이식) — 아래는 한우 전용 클래스,
@@ -3501,7 +3536,7 @@ let currentUser=null; // {id, name, role:'edit'|'view', company}
 // ══════════════════════
 // 자동 업데이트 감지
 // ══════════════════════
-const APP_VERSION = 346; // 내부 버전번호 = 표시버전×100 (104=v1.04). 패치할 때마다 +1 하세요 (version.json 불필요 — 업데이트 감지는 이 값을 직접 읽음)
+const APP_VERSION = 347; // 내부 버전번호 = 표시버전×100 (104=v1.04). 패치할 때마다 +1 하세요 (version.json 불필요 — 업데이트 감지는 이 값을 직접 읽음)
 const APP_VERSION_LABEL = 'v' + (APP_VERSION/100).toFixed(2);
 try{ document.getElementById('appVerBadge').textContent = APP_VERSION_LABEL; }catch(e){}
 /* ── 전역 에러 안전망(v2.21): 스크립트가 죽으면 흰 화면/먹통 대신 원인을 배너로 표시 ── */
@@ -5319,7 +5354,7 @@ function hasAiAccess(){
   if(currentUser._bootstrap)return true; // 오프라인/부트스트랩 admin/admin 계정(DB 미연결 시 로그인 유일 수단)만 예외
   return !!(currentUser.tabs&&currentUser.tabs.includes('ai'));
 }
-let leftCollapsed=false;
+let leftCollapsed=window.innerWidth<=860; // 모바일 화면에서는 원료 선택 패널을 기본적으로 접어둠(오버레이 서랍이라 펼치면 화면을 다 가림)
 function toggleLeftPanel(){
   leftCollapsed=!leftCollapsed;
   const p=document.getElementById('leftpanel');
@@ -5337,7 +5372,7 @@ function switchTabDirect(name){
   const lpt=document.getElementById('lpToggleTab');
   if(isCalc){
     lpt.classList.remove('hidden');
-    if(!leftCollapsed)lp.classList.remove('collapsed');
+    lp.classList.toggle('collapsed',leftCollapsed);
   }else{
     lpt.classList.add('hidden');
     lp.classList.add('collapsed');
