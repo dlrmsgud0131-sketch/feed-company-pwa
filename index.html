@@ -329,6 +329,10 @@ table.pr-table td.num{text-align:right}
   #feedName{width:96px}
   #feedDate{width:96px}
   #ribbon,#tabbar{-webkit-overflow-scrolling:touch}
+  /* 리본은 버튼이 많아 가로스크롤만으로는 잘려서 안 보이던 버그 — 줄바꿈으로 전환 */
+  #ribbon{flex-wrap:wrap;height:auto;min-height:46px;padding:6px 8px;overflow-x:visible}
+  /* 배합비 탭 상단(사료명·불러오기) 툴바가 flex-wrap 없이 좁은 화면에서 그냥 잘려서 안 보이던 실제 버그 수정 */
+  .hist-load-group{flex-wrap:wrap;row-gap:6px}
   .toolbar{padding:8px 10px;gap:6px}
   .cards{padding:8px 10px 0;gap:8px}
   .card{min-width:calc(50% - 8px);padding:9px 12px}
@@ -461,7 +465,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   <span class="logo">🌾 경인사료</span>
   <div class="r-sep"></div>
   <button class="r-btn" onclick="openBackupModal()" title="백업/복원" style="padding:4px 8px;background:#0891b2;border-color:#0e7490">💾</button>
-  <span id="userBadge" style="margin-left:8px;font-size:11px;color:#fff;background:rgba(255,255,255,.15);padding:3px 10px;border-radius:12px;display:none"></span>
+  <span id="userBadge" style="margin-left:8px;font-size:11px;color:#fff;background:rgba(255,255,255,.15);padding:3px 10px;border-radius:12px;display:none;white-space:nowrap;flex-shrink:0"></span>
   <button class="r-btn" id="logoutBtn" onclick="doLogout()" title="로그아웃" style="padding:4px 8px;background:#64748b;border-color:#475569;display:none">로그아웃</button>
   <button class="r-btn" id="userMgmtBtn" onclick="openUserMgmt()" title="계정 관리" style="padding:4px 8px;background:#be185d;border-color:#9d174d;display:none">👥 계정</button>
   <button class="r-btn" id="activityLogBtn" onclick="openActivityLog()" title="다른 계정들의 최근 변경 내역" style="padding:4px 8px;background:#0f766e;border-color:#115e59;display:none">📋 활동 로그</button>
@@ -3536,7 +3540,7 @@ let currentUser=null; // {id, name, role:'edit'|'view', company}
 // ══════════════════════
 // 자동 업데이트 감지
 // ══════════════════════
-const APP_VERSION = 347; // 내부 버전번호 = 표시버전×100 (104=v1.04). 패치할 때마다 +1 하세요 (version.json 불필요 — 업데이트 감지는 이 값을 직접 읽음)
+const APP_VERSION = 348; // 내부 버전번호 = 표시버전×100 (104=v1.04). 패치할 때마다 +1 하세요 (version.json 불필요 — 업데이트 감지는 이 값을 직접 읽음)
 const APP_VERSION_LABEL = 'v' + (APP_VERSION/100).toFixed(2);
 try{ document.getElementById('appVerBadge').textContent = APP_VERSION_LABEL; }catch(e){}
 /* ── 전역 에러 안전망(v2.21): 스크립트가 죽으면 흰 화면/먹통 대신 원인을 배너로 표시 ── */
